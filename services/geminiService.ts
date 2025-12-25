@@ -1,21 +1,9 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import {
-  AppMode,
-  SummaryLength,
-  ChatStyle,
-  Language,
-  Message
-} from "../types";
+import { AppMode, SummaryLength, ChatStyle, Language, Message } from "../types";
+import { GEMINI_MODEL } from "../config";
 
-// ❌ config / env yok
-// ✅ direkt API key ve model
-const GEMINI_API_KEY = 'AIzaSyAAY-nW4x5mzgb7l1UkGN33JsACV0TlEUI';
-const GEMINI_MODEL = 'gemini-3-flash-preview';
-
-// Gemini client
-const ai = new GoogleGenAI({
-  apiKey: GEMINI_API_KEY
-});
+// Initialize the Google GenAI client using the pre-configured environment variable.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export async function askGemini(
   prompt: string,
@@ -32,70 +20,37 @@ export async function askGemini(
   }
 ) {
   let systemInstruction = `Response language must be strictly ${options.language}. `;
-
+  
   if (mode === AppMode.SUMMARIZE) {
-    systemInstruction += `
-You are an image summarizer.
-Length: ${options.summaryLength}.
-${options.useBullets ? 'Use bullet points.' : ''}
-${options.generateTitle ? 'Include a catchy title.' : ''}
-`;
+    systemInstruction += `You are an image summarizer. Length: ${options.summaryLength}. ${options.useBullets ? 'Use bullet points.' : ''} ${options.generateTitle ? 'Include a catchy title.' : ''}`;
   } else if (mode === AppMode.OCR) {
-    systemInstruction += `
-Extract all visible text from the image.
-If tables exist, format them clearly or provide CSV-like output.
-`;
+    systemInstruction += `Extract all visible text from the image. If there are tables, try to format them clearly or offer a CSV-like structure.`;
   } else if (mode === AppMode.CHAT) {
-    systemInstruction += `
-You are a helpful assistant discussing an image.
-Style: ${options.chatStyle}.
-Maintain conversation context.
-`;
+    systemInstruction += `You are a helpful assistant talking about an image. Your style is ${options.chatStyle}. Keep the context of the conversation.`;
   }
 
-  // Memory handling
-  const msgLimit =
-    options.memoryLevel === 'high'
-      ? 15
-      : options.memoryLevel === 'medium'
-      ? 8
-      : 4;
-
-  const historyContent = options.history
-    ? options.history
-        .slice(-msgLimit)
-        .map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`)
-        .join('\n')
+  // Handle history based on memory level
+  const msgLimit = options.memoryLevel === 'high' ? 15 : options.memoryLevel === 'medium' ? 8 : 4;
+  const historyContent = options.history 
+    ? options.history.slice(-msgLimit).map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n')
     : '';
 
-  const finalPrompt = historyContent
-    ? `Context:\n${historyContent}\n\nCurrent Task: ${prompt}`
-    : prompt;
+  const finalPrompt = historyContent ? `Context:\n${historyContent}\n\nCurrent Task: ${prompt}` : prompt;
 
   try {
-    const response: GenerateContentResponse =
-      await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: {
-          parts: [
-            { text: finalPrompt },
-            ...(imageB64
-              ? [
-                  {
-                    inlineData: {
-                      mimeType: "image/png",
-                      data: imageB64.split(',')[1]
-                    }
-                  }
-                ]
-              : [])
-          ]
-        },
-        config: {
-          systemInstruction,
-          temperature: 0.7
-        }
-      });
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: { 
+        parts: [
+          { text: finalPrompt }, 
+          ...(imageB64 ? [{ inlineData: { mimeType: "image/png", data: imageB64.split(',')[1] } }] : [])
+        ] 
+      },
+      config: {
+        systemInstruction,
+        temperature: 0.7,
+      }
+    });
 
     return response.text || "No response generated.";
   } catch (error: any) {
