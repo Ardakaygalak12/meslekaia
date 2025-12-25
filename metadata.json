@@ -1,0 +1,8 @@
+{
+  "name": "Copy of Gemini Multimodal Vision-Audio AI Assistant",
+  "description": "A high-end AI assistant that processes text, images, and audio using Gemini. Supports OCR, image summarization, region-based analysis, and screen sharing.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
